@@ -1,0 +1,342 @@
+---MainActivity.kt---
+
+package com.maden.wallet
+
+import androidx.appcompat.app.AppCompatActivity
+import android.os.Bundle
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+    }
+}
+_____________________________________________________________________________________________________________________________________
+
+---WalletFragment.kt---
+
+package com.maden.wallet
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.os.Bundle
+import androidx.fragment.app.Fragment
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.navigation.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.maden.wallet.adapter.ProductListAdapter
+import kotlinx.android.synthetic.main.fragment_wallet.*
+import java.lang.Exception
+
+
+class WalletFragment : Fragment() {
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_wallet, container, false)
+    }
+
+    private var nameArrayList = ArrayList<String>()
+    private var priceArrayList = ArrayList<String>()
+
+    lateinit var productAdapter: ProductListAdapter
+
+    lateinit var sharedPreferences: SharedPreferences
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+
+
+        sharedPreferences = requireActivity()
+            .getSharedPreferences("com.maden.wallet", Context.MODE_PRIVATE)
+        val wallet:Int = sharedPreferences.getInt("salary", -1)
+        val wallet2:Int = sharedPreferences.getInt("salary2", -1)
+
+
+        if(wallet <= -1 || wallet2 <= -1) {
+            navSalary()
+        } else {
+            walletText.text = "My Salary: $wallet $"
+            walletText2.text = "Remaining Salary: $wallet2 $"
+        }
+
+
+
+        databaseList()
+        productAdapter = ProductListAdapter(nameArrayList, priceArrayList)
+        productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
+        productRecyclerView.adapter = productAdapter
+
+
+
+        addProduct.setOnClickListener{ navProduct() }
+        addSalary.setOnClickListener { navSalary() }
+        deleteDB.setOnClickListener { deleteAllDB() }
+    }
+
+    private val databaseName = "Wallet"
+    private val tableName = "wallet"
+
+    private fun databaseList(){
+        try {
+
+            nameArrayList.clear()
+            priceArrayList.clear()
+            val myDatabase =
+                requireActivity().openOrCreateDatabase(databaseName,
+                        Context.MODE_PRIVATE, null)
+
+            myDatabase.execSQL("CREATE TABLE IF NOT EXISTS $tableName (id INTEGER PRIMARY KEY, name VARCHAR, price INT)")
+
+            val cursor = myDatabase.rawQuery("SELECT * FROM $tableName", null)
+
+            val nameIx = cursor.getColumnIndex("name")
+            val priceIx = cursor.getColumnIndex("price")
+
+            while (cursor.moveToNext()) {
+                nameArrayList.add("Product: "+ cursor.getString(nameIx))
+                priceArrayList.add("Cost: "+ cursor.getString(priceIx))
+            }
+            productAdapter.notifyDataSetChanged()
+
+            cursor.close()
+        } catch (e: Exception){
+            e.printStackTrace()
+        }
+    }
+
+    private fun deleteAllDB() {
+
+        try {
+            val myDatabase =
+                requireActivity().openOrCreateDatabase(databaseName,
+                    Context.MODE_PRIVATE, null)
+
+            myDatabase.execSQL("CREATE TABLE IF NOT EXISTS $tableName (id INTEGER PRIMARY KEY, name VARCHAR, price INT)")
+
+            myDatabase.execSQL("DELETE FROM $tableName")
+            nameArrayList.clear()
+            priceArrayList.clear()
+            productAdapter.notifyDataSetChanged()
+            Toast.makeText(requireContext(), "Successfully Deleted.", Toast.LENGTH_SHORT).show()
+
+        }catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+    }
+
+    private fun navSalary() {
+        val action = WalletFragmentDirections
+            .actionWalletFragmentToAddSalaryFragment()
+        view?.findNavController()?.navigate(action)
+    }
+
+    private fun navProduct(){
+        val action = WalletFragmentDirections
+            .actionWalletFragmentToAddProductFragment()
+        view?.findNavController()?.navigate(action)
+    }
+}
+________________________________________________________________________________________________________________________________________________________________________
+
+---AddProductFragment.kt---
+
+package com.maden.wallet
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.os.Bundle
+import androidx.fragment.app.Fragment
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.navigation.findNavController
+import kotlinx.android.synthetic.main.fragment_add_product.*
+import java.lang.Exception
+
+
+class AddProductFragment : Fragment() {
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_add_product, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+
+        saveButton.setOnClickListener{
+            val name = nameText.text.toString()
+            var price:Int?
+            val priceText = priceText.text.toString()
+            price = priceText.toIntOrNull()
+
+            if (name != "" && price != null){
+                databaseList(name, price)
+            }
+        }
+
+
+        goBack.setOnClickListener { navToWallet() }
+    }
+
+
+
+    private val databaseName = "Wallet"
+    private val tableName = "wallet"
+    lateinit var sharedPreferences: SharedPreferences
+
+    private fun databaseList(name: String, price: Int){
+
+        sharedPreferences = requireActivity()
+            .getSharedPreferences("com.maden.wallet", Context.MODE_PRIVATE)
+        val wallet:Int = sharedPreferences.getInt("salary2", -1)
+
+        if (wallet > price) {
+            try {
+
+                val database =
+                    requireActivity().openOrCreateDatabase(databaseName,
+                        Context.MODE_PRIVATE, null)
+
+                database.execSQL("CREATE TABLE IF NOT EXISTS wallet (id INTEGER PRIMARY KEY, name VARCHAR, price VARCHAR)")
+
+
+                val sqlString = "INSERT INTO wallet (name, price) VALUES(?, ?)"
+                val statement = database.compileStatement(sqlString)
+                val priceText = price.toString()
+
+                val salarySP: Int = wallet - price
+
+                sharedPreferences.edit().putInt("salary2", salarySP).apply()
+
+                statement.bindString(1, name)
+                statement.bindString(2, priceText)
+                statement.execute()
+
+
+            } catch (e: Exception){
+                e.printStackTrace()
+            }
+
+            messageSuccess()
+            navToWallet()
+        } else {
+            messageFail()
+        }
+
+
+    }
+
+    private fun messageSuccess(){
+        Toast.makeText(requireContext(),
+            "Successfully Added.",
+            Toast.LENGTH_LONG).show()
+    }
+    private fun messageFail(){
+        Toast.makeText(requireContext(),
+            "Your Budget is Not Enough, Please wait another salary!",
+            Toast.LENGTH_LONG).show()
+    }
+
+    private fun navToWallet(){
+        val action = AddProductFragmentDirections
+            .actionAddProductFragmentToWalletFragment()
+        requireView().findNavController().navigate(action)
+    }
+}
+____________________________________________________________________________________________________________________________________________________________
+
+---AddSalaryFragment.kt---
+
+package com.maden.wallet
+
+import android.content.Context
+import android.os.Bundle
+import androidx.fragment.app.Fragment
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.navigation.findNavController
+import kotlinx.android.synthetic.main.fragment_add_salary.*
+
+
+class AddSalaryFragment : Fragment() {
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_add_salary, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        goBackAddSalary.setOnClickListener {
+            navWallet()
+        }
+
+        saveButtonAddSalary.setOnClickListener {
+            var salary: String = salaryAddSalary.text.toString()
+            var salaryInt: Int? = salary.toIntOrNull()
+            var salaryInt2: Int = 0
+
+            if(salaryInt != null) {
+                val sharedPreferences = requireActivity()
+                    .getSharedPreferences("com.maden.wallet", Context.MODE_PRIVATE)
+                val wallet:Int = sharedPreferences.getInt("salary", 0)
+                val wallet2:Int = sharedPreferences.getInt("salary2", 0)
+
+                salaryInt2 = wallet2 + salaryInt
+                salaryInt += wallet
+
+
+                sharedPreferences.edit().putInt("salary", salaryInt).apply()
+                sharedPreferences.edit().putInt("salary2", salaryInt2).apply()
+                navWallet()
+            } else {
+                Toast.makeText(requireContext(), "Enter a value.", Toast.LENGTH_SHORT).show()
+            }
+
+        }
+    }
+
+    private fun navWallet(){
+        val action = AddSalaryFragmentDirections.actionAddSalaryFragmentToWalletFragment()
+        view?.findNavController()?.navigate(action)
+    }
+}
